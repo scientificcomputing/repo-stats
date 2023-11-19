@@ -32,7 +32,7 @@ for key, infile in zip(["clones", "views"], [repo_clones, repo_views]):
     end_date = pandas.to_datetime(dates).sort_values().iloc[-1]
     print("-"*25)
     print(
-        f"Github traffic review from {start_date.strftime(date_format)} to {end_date.strftime(date_format)}")
+        f"Github traffic review of https://www.github.com/{owner}/{repo} from {start_date.strftime(date_format)} to {end_date.strftime(date_format)}")
     print(f"Number of unique {key}: {unique}")
     num_days = (end_date-start_date).days
 
