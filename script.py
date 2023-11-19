@@ -108,8 +108,9 @@ def get_launchpad_info(user: str, name: str, package: str,
     lp_df = pandas.DataFrame.from_records(data, columns=["binary", "count"])
     diff_days = datetime.datetime.strptime(
         end_date, "%Y-%m-%d") - datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    print(f"Launchpad downloads of {package}")
     print(
-        f"Accumulated Launchpad downloads for the period {start_date} to {end_date} ({diff_days.days+1} days): {lp_df['count'].sum()}")
+        f"Period {start_date} to {end_date} ({diff_days.days+1} days): {lp_df['count'].sum()}")
 
 
 if __name__ == "__main__":
@@ -149,9 +150,11 @@ if __name__ == "__main__":
     if args.pypi is not None:
         get_pypi_stats(args.pypi)
         print("-"*25)
+
     if args.lu is not None and args.lppa is not None and args.lpackage is not None:
         start_date = datetime.datetime.strptime(args.lmonth, "%B %Y")
         end_date = start_date.replace(month=start_date.month+1, day=1) - \
             datetime.timedelta(days=1)
         get_launchpad_info(args.lu, args.lppa, args.lpackage, start_date.strftime(
             "%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+        print("-"*25)
