@@ -7,7 +7,9 @@ build-backend = "setuptools.build_meta"
 name = "repo-stats"
 version = "0.1.0"
 dependencies = [
-    "pandas"
+    "pandas",
+    "condastats",
+    "pypistats"
 ]
 
 [project.optional-dependencies]
