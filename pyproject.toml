@@ -13,6 +13,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ipython"]
+dev = ["ipython", "isort"]
 [tool.setuptools]
 packages = []
