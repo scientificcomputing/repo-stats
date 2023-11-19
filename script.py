@@ -4,10 +4,12 @@ import json
 import math
 import subprocess
 import warnings
+from pathlib import Path
 
 import condastats.cli
 import pandas
 import pypistats
+from launchpadlib.launchpad import Launchpad
 
 _date_format = '%d-%m-%Y'
 
@@ -84,6 +86,32 @@ def get_pypi_stats(name: str):
         f"Monthly average downloads: {math.floor(pypi_df['downloads'].mean())}")
 
 
+def get_launchpad_info(user: str, name: str, package: str,
+                       start_date="2023-10-01",
+                       end_date="2023-10-31"):
+    cache_dir = (Path.cwd() / "cache").absolute
+    launchpad = Launchpad.login_anonymously('just testing', 'production')
+    ppa = launchpad.people[user].getPPAByName(name=name)
+    bins = ppa.getPublishedBinaries(binary_name=package, exact_match=True)
+    downloaded_builds = {}
+    for bin in bins:
+        bin_count = bin.getDailyDownloadTotals(
+            start_date=start_date, end_date=end_date)
+        if len(bin_count) > 0:
+            for date, count in bin_count.items():
+                key = bin.binary_package_version
+                if key in downloaded_builds:
+                    downloaded_builds[key] += count
+                else:
+                    downloaded_builds[key] = count
+    data = [[key, value] for (key, value) in downloaded_builds.items()]
+    lp_df = pandas.DataFrame.from_records(data, columns=["binary", "count"])
+    diff_days = datetime.datetime.strptime(
+        end_date, "%Y-%m-%d") - datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    print(
+        f"Accumulated Launchpad downloads for the period {start_date} to {end_date} ({diff_days.days+1} days): {lp_df['count'].sum()}")
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
@@ -100,6 +128,15 @@ if __name__ == "__main__":
     parser.add_argument("--without-mirrors", action="store_false",
                         default=True, dest="with_mirrors",
                         help="If getting pypi images, decide if you want to get info with or without mirrors")
+    parser.add_argument("--launchpad-user", default=None, type=str,
+                        dest="lu", help="Team/User owning package on Launchpad")
+    parser.add_argument("--launchpad-ppa", default=None, type=str,
+                        dest="lppa", help="PPA on Launchpad")
+    parser.add_argument("--launchpad-package", default=None, type=str,
+                        dest="lpackage", help="Package on Launchpad")
+    parser.add_argument("--launchpad-month", default="October 2023", dest="lmonth", type=str,
+                        help="Month and Year to get data from")
+
     args = parser.parse_args()
     if args.github is not None:
         get_github_stats(args.github)
@@ -112,3 +149,9 @@ if __name__ == "__main__":
     if args.pypi is not None:
         get_pypi_stats(args.pypi)
         print("-"*25)
+    if args.lu is not None and args.lppa is not None and args.lpackage is not None:
+        start_date = datetime.datetime.strptime(args.lmonth, "%B %Y")
+        end_date = start_date.replace(month=start_date.month+1, day=1) - \
+            datetime.timedelta(days=1)
+        get_launchpad_info(args.lu, args.lppa, args.lpackage, start_date.strftime(
+            "%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
