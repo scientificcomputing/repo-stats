@@ -81,7 +81,7 @@ def get_github_stats(repository: str) -> None:
         )
 
 
-def get_pypi_stats(name: str, with_mirrors: bool) -> None:
+def get_pypi_stats(name: str, with_mirrors: bool, month: str = None) -> None:
     if with_mirrors:
         sub_key = "with_mirrors"
     else:
@@ -90,19 +90,23 @@ def get_pypi_stats(name: str, with_mirrors: bool) -> None:
     pypi_json = pypistats.overall(name, total="monthly", format="json")
     pypi_stats = json.loads(pypi_json)["data"]
     accumulate_stats = {"dates": [], "downloads": []}
-    for month in pypi_stats:
-        if month["category"] != sub_key:
+    for conda_month in pypi_stats:
+        if conda_month["category"] != sub_key:
             continue
         accumulate_stats["dates"].append(
-            datetime.datetime.strptime(month["date"], "%Y-%m")
+            datetime.datetime.strptime(conda_month["date"], "%Y-%m")
         )
-        accumulate_stats["downloads"].append(month["downloads"])
+        accumulate_stats["downloads"].append(conda_month["downloads"])
     pypi_df = pandas.DataFrame.from_dict(accumulate_stats)
     start_date = pypi_df["dates"].sort_values().iloc[0]
     end_date = pypi_df["dates"].sort_values().iloc[-1]
-
+    print(f"PYPI: https://pypi.org/project/{name} ({sub_key})")
+    if month is not None:
+        pypi_df.dates = pandas.to_datetime(pypi_df.dates)
+        print(
+            f"Downloads in {month}: {pypi_df[pypi_df.dates == month].downloads.iloc[0]}")
     print(
-        f"PYPI: https://pypi.org/project/{name} ({sub_key}) from {start_date.strftime(_date_format)} to {end_date.strftime(_date_format)}"
+        f"From {start_date.strftime(_date_format)} to {end_date.strftime(_date_format)}"
     )
     print(f"Total downloads: {pypi_df['downloads'].sum()}")
     print(
@@ -180,9 +184,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Package on Launchpad",
     )
     parser.add_argument(
-        "--launchpad-month",
+        "--month",
         default="October 2023",
-        dest="lmonth",
+        dest="month",
         type=str,
         help="Month and Year to get data from",
     )
@@ -203,20 +207,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         get_conda_stats(args.conda)
         print("-" * 25)
 
+    month = datetime.datetime.strptime(args.month, "%B %Y")
     if args.pypi is not None:
-        get_pypi_stats(args.pypi, args.with_mirrors)
+        get_pypi_stats(args.pypi, args.with_mirrors,
+                       month=month.strftime("%Y.%m"))
         print("-" * 25)
-
     if args.lu is not None and args.lppa is not None and args.lpackage is not None:
-        start_date = datetime.datetime.strptime(args.lmonth, "%B %Y")
-        end_date = start_date.replace(
-            month=start_date.month + 1, day=1
+        end_date = month.replace(
+            month=month.month + 1, day=1
         ) - datetime.timedelta(days=1)
         get_launchpad_info(
             args.lu,
             args.lppa,
             args.lpackage,
-            start_date.strftime("%Y-%m-%d"),
+            month.strftime("%Y-%m-%d"),
             end_date.strftime("%Y-%m-%d"),
         )
         print("-" * 25)
