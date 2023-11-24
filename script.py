@@ -21,11 +21,14 @@ def get_conda_stats(name: str) -> None:
     start_month = conda_dates.iloc[0]
     end_month = conda_dates.iloc[-1]
     month_format = "%m-%Y"
+    end_month_str = end_month.strftime(month_format)
     print(
-        f"Monthly conda stats from {start_month.strftime(month_format)} to {end_month.strftime(month_format)}"
+        f"Monthly conda stats from {start_month.strftime(month_format)} to {end_month_str}"
     )
     print(f"Total downloads: {stats.sum()}")
     print(f"Average per month: {math.floor(stats.mean())}")
+    print(
+        f"Num downloads last month({end_month_str}): {stats[end_month.strftime('%Y-%m')]}")
 
 
 def get_github_stats(repository: str) -> None:
@@ -85,7 +88,6 @@ def get_pypi_stats(name: str, with_mirrors: bool) -> None:
         sub_key = "without_mirrors"
 
     pypi_json = pypistats.overall(name, total="monthly", format="json")
-
     pypi_stats = json.loads(pypi_json)["data"]
     accumulate_stats = {"dates": [], "downloads": []}
     for month in pypi_stats:
@@ -103,7 +105,8 @@ def get_pypi_stats(name: str, with_mirrors: bool) -> None:
         f"PYPI: https://pypi.org/project/{name} ({sub_key}) from {start_date.strftime(_date_format)} to {end_date.strftime(_date_format)}"
     )
     print(f"Total downloads: {pypi_df['downloads'].sum()}")
-    print(f"Monthly average downloads: {math.floor(pypi_df['downloads'].mean())}")
+    print(
+        f"Monthly average downloads: {math.floor(pypi_df['downloads'].mean())}")
 
 
 def get_launchpad_info(
@@ -115,7 +118,8 @@ def get_launchpad_info(
     bins = ppa.getPublishedBinaries(binary_name=package, exact_match=True)
     downloaded_builds = {}
     for bin in bins:
-        bin_count = bin.getDailyDownloadTotals(start_date=start_date, end_date=end_date)
+        bin_count = bin.getDailyDownloadTotals(
+            start_date=start_date, end_date=end_date)
         if len(bin_count) > 0:
             for date, count in bin_count.items():
                 key = bin.binary_package_version
@@ -182,6 +186,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=str,
         help="Month and Year to get data from",
     )
+    parser.add_argument(
+        "--docker",
+        default=None,
+        dest="docker",
+        type=str,
+        help="Name of docker image",
+    )
 
     args = parser.parse_args(argv)
     if args.github is not None:
@@ -209,7 +220,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             end_date.strftime("%Y-%m-%d"),
         )
         print("-" * 25)
+    if args.docker is not None:
+        get_docker_stats(args.docker)
     return 0
+
+
+def get_docker_stats(image: str):
+    output = subprocess.run(["curl", "-s", f"https://hub.docker.com/v2/repositories/{image}"],
+                            capture_output=True,
+                            )
+    docker_output = json.loads(output.stdout)
+    start_date = datetime.datetime.strptime(
+        docker_output["date_registered"], "%Y-%m-%dT%H:%M:%S.%fZ")
+    uct_now = datetime.datetime.utcnow()
+    diff = uct_now - start_date
+    # Rough estimeate of number of months
+    months = math.floor(diff.days / 365 * 12)
+    num_downloads = docker_output["pull_count"]
+    print(f"Docker {image}")
+    print(
+        f"Number of downloads since {start_date.strftime('%d-%m-%Y')} to {uct_now.strftime('%d-%m-%Y')}: {num_downloads}")
+    print(f"Average per month {math.floor(num_downloads/ months)}")
 
 
 if __name__ == "__main__":
